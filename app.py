@@ -21,33 +21,17 @@ class Order(db.Model):
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
-class Ad(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    budget = db.Column(db.Float, nullable=False)
-    platform = db.Column(db.String(50), nullable=False)
-    status = db.Column(db.String(20), default='Active')
-
-# ================== القائمة الجانبية (Sidebar) ==================
+# ================== القائمة الجانبية ==================
 def get_sidebar(active_page):
     links = [
         ("/", "home", "fas fa-home", "لوحة التحكم"),
         ("/kpi", "kpi", "fas fa-chart-line", "مؤشرات الأداء (KPI)"),
-        ("/channels", "channels", "fas fa-store", "قنوات البيع"),
         ("/products", "products", "fas fa-box", "المنتجات"),
         ("/orders", "orders", "fas fa-clipboard-list", "الطلبات"),
-        ("/pos", "pos", "fas fa-cash-register", "نقطة البيع"),
-        ("/barcode", "barcode", "fas fa-barcode", "الماسح الضوئي"),
-        ("/inventory", "inventory", "fas fa-warehouse", "المخزون"),
-        ("/supply", "supply", "fas fa-truck-loading", "التوريد"),
-        ("/expenses", "expenses", "fas fa-money-bill-wave", "المصاريف"),
+        ("/ads", "ads", "fas fa-bullhorn", "محل الإعلانات"),
         ("/finance", "finance", "fas fa-wallet", "المالية"),
-        ("/users", "users", "fas fa-users", "المستخدمون"),
         ("/customers", "customers", "fas fa-user-friends", "العملاء"),
         ("/delivery", "delivery", "fas fa-truck", "شريك التوصيل"),
-        ("/analytics", "analytics", "fas fa-chart-bar", "التحليلات"),
-        ("/sendpilot", "sendpilot", "fas fa-paper-plane", "Sendpilot"),
-        ("/ads", "ads", "fas fa-bullhorn", "محل الإعلانات"),
         ("/ai", "ai", "fas fa-robot", "AI"),
     ]
     html = '<div class="sidebar"><h4>Khaled Store</h4>'
@@ -101,83 +85,68 @@ BASE_HTML = """
 </html>
 """
 
-# ================== صفحة الطلبات ==================
-ORDERS_CONTENT = """
-<div class="card-custom">
-    <table>
-        <thead><tr><th>هاتف العميل</th><th>اسم العميل</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-        <tbody>
-            {% for order in orders %}
-            <tr>
-                <td style="direction: ltr; text-align: right;">{{ order.phone }}</td>
-                <td>{{ order.customer }}</td>
-                <td>{{ order.product or '-' }}</td>
-                <td>{{ order.amount }} د.ج</td>
-                <td><span class="badge {% if order.status == 'Pending' %}badge-pending{% else %}badge-delivered{% endif %}">{{ order.status }}</span></td>
-                <td style="direction: ltr; text-align: right;">
-                    <a href="tel:{{ order.phone }}" class="action-btn btn-call"><i class="fas fa-phone"></i></a>
-                    <a href="https://wa.me/213{{ order.phone[1:] if order.phone.startswith('0') else order.phone }}" target="_blank" class="action-btn btn-whatsapp"><i class="fab fa-whatsapp"></i></a>
-                </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="6" class="text-center text-muted">لا توجد طلبات حالياً.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-"""
-
-# ================== صفحة الإعلانات ==================
-ADS_CONTENT = """
-<div class="card-custom">
-    <div class="mb-3"><button class="btn btn-primary" style="background:#a855f7; border:none;">+ حملة إعلانية جديدة</button></div>
-    <table>
-        <thead><tr><th>اسم الحملة</th><th>المنصة</th><th>الميزانية</th><th>الحالة</th></tr></thead>
-        <tbody>
-            <tr><td>حملة رمضان</td><td>فيسبوك</td><td>50000 د.ج</td><td><span class="badge badge-delivered">Active</span></td></tr>
-            <tr><td>ترويج المنتجات</td><td>تيك توك</td><td>20000 د.ج</td><td><span class="badge badge-delivered">Active</span></td></tr>
-        </tbody>
-    </table>
-</div>
-"""
-
-# ================== صفحة عامة (لأي أيقونة أخرى) ==================
-def generate_generic_page(page_title):
-    return f"""
-    <div class="card-custom" style="text-align: center; padding: 50px;">
-        <i class="fas fa-tools" style="font-size: 50px; color: #a855f7; margin-bottom: 20px;"></i>
-        <h3>مرحباً بك في قسم {page_title}</h3>
-        <p class="text-muted">هذه الصفحة جاهزة للربط مع قاعدة البيانات قريباً.</p>
-    </div>
-    """
-
-# ================== المسارات (Routes) ==================
+# ================== المسارات ==================
 @app.route('/')
 def dashboard():
-    return render_template_string(BASE_HTML, sidebar=get_sidebar('home'), page_title="لوحة التحكم", content="<h3>أهلاً بك يا خالد!</h3>")
+    content = """
+    <div class="card-custom" style="text-align: center; padding: 40px;">
+        <h3 style="color: #a855f7;">أهلاً بك يا خالد!</h3>
+        <p>مرحباً بك في لوحة التحكم الخاصة بمتجرك.</p>
+    </div>
+    """
+    return render_template_string(BASE_HTML, sidebar=get_sidebar('home'), page_title="لوحة التحكم", content=content)
 
 @app.route('/orders')
 def orders():
     all_orders = Order.query.order_by(Order.id.desc()).all()
-    html_content = render_template_string(ORDERS_CONTENT, orders=all_orders)
-    return render_template_string(BASE_HTML, sidebar=get_sidebar('orders'), page_title="الطلبات", content=html_content)
+    rows = ""
+    for order in all_orders:
+        status_class = "badge-pending" if order.status == 'Pending' else "badge-delivered"
+        rows += f"""
+        <tr>
+            <td style="direction: ltr; text-align: right;">{order.phone}</td>
+            <td>{order.customer}</td>
+            <td>{order.product or '-'}</td>
+            <td>{order.amount} د.ج</td>
+            <td><span class="badge {status_class}">{order.status}</span></td>
+            <td style="direction: ltr; text-align: right;">
+                <a href="tel:{order.phone}" class="action-btn btn-call"><i class="fas fa-phone"></i></a>
+                <a href="https://wa.me/213{order.phone[1:] if order.phone.startswith('0') else order.phone}" target="_blank" class="action-btn btn-whatsapp"><i class="fab fa-whatsapp"></i></a>
+            </td>
+        </tr>
+        """
+    
+    if not rows:
+        rows = '<tr><td colspan="6" class="text-center text-muted">لا توجد طلبات حالياً.</td></tr>'
 
-@app.route('/ads')
-def ads():
-    return render_template_string(BASE_HTML, sidebar=get_sidebar('ads'), page_title="محل الإعلانات", content=ADS_CONTENT)
+    content = f"""
+    <div class="card-custom">
+        <table>
+            <thead><tr><th>هاتف العميل</th><th>اسم العميل</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <tbody>{rows}</tbody>
+        </table>
+    </div>
+    """
+    return render_template_string(BASE_HTML, sidebar=get_sidebar('orders'), page_title="الطلبات", content=content)
 
 @app.route('/<page_name>')
 def generic_page(page_name):
     titles = {
-        'kpi': 'مؤشرات الأداء', 'channels': 'قنوات البيع', 'products': 'المنتجات',
-        'pos': 'نقطة البيع', 'barcode': 'الماسح الضوئي', 'inventory': 'المخزون',
-        'supply': 'التوريد', 'expenses': 'المصاريف', 'finance': 'المالية',
-        'users': 'المستخدمون', 'customers': 'العملاء', 'delivery': 'شريك التوصيل',
-        'analytics': 'التحليلات', 'sendpilot': 'Sendpilot', 'ai': 'الذكاء الاصطناعي'
+        'kpi': 'مؤشرات الأداء', 'products': 'المنتجات', 'ads': 'محل الإعلانات',
+        'finance': 'المالية', 'customers': 'العملاء', 'delivery': 'شريك التوصيل', 'ai': 'الذكاء الاصطناعي'
     }
     title = titles.get(page_name, "صفحة")
-    return render_template_string(BASE_HTML, sidebar=get_sidebar(page_name), page_title=title, content=generate_generic_page(title))
+    
+    content = f"""
+    <div class="card-custom" style="text-align: center; padding: 50px;">
+        <i class="fas fa-tools" style="font-size: 50px; color: #a855f7; margin-bottom: 20px;"></i>
+        <h3>مرحباً بك في قسم {title}</h3>
+        <p class="text-muted">هذه الصفحة جاهزة للربط مع قاعدة البيانات قريباً.</p>
+    </div>
+    """
+    return render_template_string(BASE_HTML, sidebar=get_sidebar(page_name), page_title=title, content=content)
 
+# إنشاء الجداول
 with app.app_context():
     db.create_all()
 
