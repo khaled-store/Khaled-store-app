@@ -11,7 +11,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# ================== قاعدة البيانات ==================
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer = db.Column(db.String(100), nullable=False)
@@ -21,17 +20,15 @@ class Order(db.Model):
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
-# ================== القائمة الجانبية ==================
 def get_sidebar(active_page):
     links = [
         ("/", "home", "fas fa-home", "لوحة التحكم"),
-        ("/kpi", "kpi", "fas fa-chart-line", "مؤشرات الأداء (KPI)"),
+        ("/kpi", "kpi", "fas fa-chart-line", "مؤشرات الأداء"),
         ("/products", "products", "fas fa-box", "المنتجات"),
         ("/orders", "orders", "fas fa-clipboard-list", "الطلبات"),
         ("/ads", "ads", "fas fa-bullhorn", "محل الإعلانات"),
         ("/finance", "finance", "fas fa-wallet", "المالية"),
         ("/customers", "customers", "fas fa-user-friends", "العملاء"),
-        ("/delivery", "delivery", "fas fa-truck", "شريك التوصيل"),
         ("/ai", "ai", "fas fa-robot", "AI"),
     ]
     html = '<div class="sidebar"><h4>Khaled Store</h4>'
@@ -41,7 +38,6 @@ def get_sidebar(active_page):
     html += '</div>'
     return html
 
-# ================== القالب الأساسي ==================
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -85,13 +81,34 @@ BASE_HTML = """
 </html>
 """
 
-# ================== المسارات ==================
+ADD_ORDER_HTML = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+<style>body { font-family: 'Cairo'; background: #f4f6f9; padding: 20px; } .form-container { background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto; }</style></head>
+<body>
+    <div class="form-container">
+        <h3 class="mb-4">إضافة طلب جديد</h3>
+        <form method="POST">
+            <div class="mb-3"><label>اسم العميل</label><input type="text" name="customer" class="form-control" required></div>
+            <div class="mb-3"><label>رقم الهاتف</label><input type="text" name="phone" class="form-control" required></div>
+            <div class="mb-3"><label>العنوان</label><input type="text" name="address" class="form-control" required></div>
+            <div class="mb-3"><label>المنتج</label><input type="text" name="product" class="form-control"></div>
+            <div class="mb-3"><label>المبلغ</label><input type="number" name="amount" class="form-control" required></div>
+            <button type="submit" class="btn btn-primary w-100" style="background:#a855f7; border:none;">حفظ</button>
+        </form>
+        <a href="/" class="d-block text-center mt-3 text-decoration-none">رجوع</a>
+    </div>
+</body></html>
+"""
+
 @app.route('/')
 def dashboard():
     content = """
     <div class="card-custom" style="text-align: center; padding: 40px;">
         <h3 style="color: #a855f7;">أهلاً بك يا خالد!</h3>
         <p>مرحباً بك في لوحة التحكم الخاصة بمتجرك.</p>
+        <a href="/add" class="btn btn-primary mt-3" style="background:#a855f7; border:none;">+ طلب جديد</a>
     </div>
     """
     return render_template_string(BASE_HTML, sidebar=get_sidebar('home'), page_title="لوحة التحكم", content=content)
@@ -102,6 +119,9 @@ def orders():
     rows = ""
     for order in all_orders:
         status_class = "badge-pending" if order.status == 'Pending' else "badge-delivered"
+        phone = order.phone if order.phone else ""
+        wa_phone = phone[1:] if phone.startswith('0') else phone
+        
         rows += f"""
         <tr>
             <td style="direction: ltr; text-align: right;">{order.phone}</td>
@@ -111,7 +131,7 @@ def orders():
             <td><span class="badge {status_class}">{order.status}</span></td>
             <td style="direction: ltr; text-align: right;">
                 <a href="tel:{order.phone}" class="action-btn btn-call"><i class="fas fa-phone"></i></a>
-                <a href="https://wa.me/213{order.phone[1:] if order.phone.startswith('0') else order.phone}" target="_blank" class="action-btn btn-whatsapp"><i class="fab fa-whatsapp"></i></a>
+                <a href="https://wa.me/213{wa_phone}" target="_blank" class="action-btn btn-whatsapp"><i class="fab fa-whatsapp"></i></a>
             </td>
         </tr>
         """
@@ -121,6 +141,7 @@ def orders():
 
     content = f"""
     <div class="card-custom">
+        <div class="mb-3"><a href="/add" class="btn btn-primary" style="background:#a855f7; border:none;">+ طلب جديد</a></div>
         <table>
             <thead><tr><th>هاتف العميل</th><th>اسم العميل</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>{rows}</tbody>
@@ -129,11 +150,26 @@ def orders():
     """
     return render_template_string(BASE_HTML, sidebar=get_sidebar('orders'), page_title="الطلبات", content=content)
 
+@app.route('/add', methods=['GET', 'POST'])
+def add():
+    if request.method == 'POST':
+        new_order = Order(
+            customer=request.form['customer'], 
+            phone=request.form['phone'], 
+            address=request.form['address'], 
+            product=request.form.get('product'), 
+            amount=float(request.form['amount'])
+        )
+        db.session.add(new_order)
+        db.session.commit()
+        return redirect(url_for('orders'))
+    return render_template_string(ADD_ORDER_HTML)
+
 @app.route('/<page_name>')
 def generic_page(page_name):
     titles = {
         'kpi': 'مؤشرات الأداء', 'products': 'المنتجات', 'ads': 'محل الإعلانات',
-        'finance': 'المالية', 'customers': 'العملاء', 'delivery': 'شريك التوصيل', 'ai': 'الذكاء الاصطناعي'
+        'finance': 'المالية', 'customers': 'العملاء', 'ai': 'الذكاء الاصطناعي'
     }
     title = titles.get(page_name, "صفحة")
     
@@ -146,7 +182,6 @@ def generic_page(page_name):
     """
     return render_template_string(BASE_HTML, sidebar=get_sidebar(page_name), page_title=title, content=content)
 
-# إنشاء الجداول
 with app.app_context():
     db.create_all()
 
