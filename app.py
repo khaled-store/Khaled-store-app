@@ -1,11 +1,10 @@
 import os
+import google.generativeai as genai
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from openai import OpenAI
 
 app = Flask(__name__)
 
-# ================== إعدادات الداتا ==================
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///khaled_store.db')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -13,10 +12,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# ================== الذكاء الاصطناعي ==================
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-proj-xxxx"))
+# ================== الذكاء الاصطناعي (Gemini) ==================
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "AIza..."))
+ai_model = genai.GenerativeModel('gemini-1.5-flash')
 
-# ================== الجداول ==================
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer = db.Column(db.String(100), nullable=False)
@@ -42,7 +41,6 @@ class Expense(db.Model):
     title = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
 
-# ================== القائمة الجانبية ==================
 def get_sidebar(active_page):
     links = [
         ("/", "home", "fas fa-home", "لوحة التحكم"),
@@ -59,7 +57,6 @@ def get_sidebar(active_page):
     html += '</div>'
     return html
 
-# ================== القالب الأساسي ==================
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -87,15 +84,12 @@ BASE_HTML = """
         .badge-pending { background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 12px; font-size: 10px; }
         .btn-primary { background: #a855f7; border: none; font-size: 12px; padding: 6px 12px; }
         .mobile-menu-btn { display: none; background: transparent; border: none; font-size: 20px; color: #a855f7; cursor: pointer; }
-        
-        /* Chat UI */
         .chat-container { display: flex; flex-direction: column; height: calc(100vh - 120px); background: white; border-radius: 8px; overflow: hidden; }
         .chat-box { flex: 1; padding: 15px; overflow-y: auto; }
         .msg { margin-bottom: 10px; padding: 10px; border-radius: 8px; max-width: 80%; }
         .msg-user { background: #a855f7; color: white; align-self: flex-end; margin-right: auto; }
         .msg-ai { background: #f1f5f9; color: #333; align-self: flex-start; margin-left: auto; }
         .chat-input { display: flex; padding: 10px; border-top: 1px solid #eee; }
-        
         @media (max-width: 768px) {
             .sidebar { right: -220px; }
             .sidebar.show { right: 0; }
@@ -119,14 +113,12 @@ BASE_HTML = """
 </html>
 """
 
-# ================== المسارات (Routes) ==================
 @app.route('/')
 def dashboard():
     total_orders = Order.query.count()
     total_products = Product.query.count()
     total_customers = Customer.query.count()
     total_sales = db.session.query(db.func.sum(Order.amount)).filter(Order.status == 'Delivered').scalar() or 0
-    
     content = f"""
     <div class="row">
         <div class="col-6 col-md-3 mb-3"><div class="card-custom text-center"><h6>الطلبات</h6><h3 class="text-primary">{total_orders}</h3></div></div>
@@ -140,9 +132,7 @@ def dashboard():
 @app.route('/orders')
 def orders():
     all_orders = Order.query.order_by(Order.id.desc()).all()
-    rows = ""
-    for o in all_orders:
-        rows += f"<tr><td>{o.phone}</td><td>{o.customer}</td><td>{o.product or '-'}</td><td>{o.amount} د.ج</td><td><span class='badge-pending'>{o.status}</span></td><td><a href='tel:{o.phone}' class='btn btn-sm btn-primary'><i class='fas fa-phone'></i></a></td></tr>"
+    rows = "".join([f"<tr><td>{o.phone}</td><td>{o.customer}</td><td>{o.product or '-'}</td><td>{o.amount} د.ج</td><td><span class='badge-pending'>{o.status}</span></td><td><a href='tel:{o.phone}' class='btn btn-sm btn-primary'><i class='fas fa-phone'></i></a></td></tr>" for o in all_orders])
     content = f"""
     <div class="card-custom">
         <div class="mb-3"><a href="/add" class="btn btn-primary">+ طلب جديد</a></div>
@@ -238,7 +228,7 @@ def ai_page():
     content = """
     <div class="chat-container">
         <div class="chat-box" id="chat-box">
-            <div class="msg msg-ai">أهلاً بك يا خالد! أنا مساعدك الذكي. كيفاش نقدر نعاونك في متجرك اليوم؟</div>
+            <div class="msg msg-ai">أهلاً بك يا خالد! أنا مساعدك الذكي (Gemini). كيفاش نقدر نعاونك في متجرك اليوم؟</div>
         </div>
         <div class="chat-input">
             <input type="text" id="user-input" class="form-control me-2" placeholder="اسألني أي حاجة..." onkeypress="if(event.key==='Enter') sendMessage()">
@@ -250,17 +240,11 @@ def ai_page():
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if(!text) return;
-            
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML += `<div class="msg msg-user">${text}</div>`;
             input.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
-
-            const res = await fetch('/ask_ai', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({prompt: text})
-            });
+            const res = await fetch('/ask_ai', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: text}) });
             const data = await res.json();
             chatBox.innerHTML += `<div class="msg msg-ai">${data.reply}</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -274,14 +258,10 @@ def ask_ai():
     data = request.json
     prompt = data.get('prompt')
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150
-        )
-        reply = response.choices[0].message.content
+        response = ai_model.generate_content(prompt)
+        reply = response.text
     except Exception as e:
-        reply = "المساعد الذكي مازال ما تربطش. تأكد من مفتاح OPENAI_API_KEY في Render."
+        reply = f"خطأ: {str(e)}"
     return jsonify({"reply": reply})
 
 with app.app_context():
