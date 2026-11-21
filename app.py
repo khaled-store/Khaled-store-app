@@ -20,15 +20,26 @@ class Order(db.Model):
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
+# ================== القائمة الجانبية (مربوطة كاملة) ==================
 def get_sidebar(active_page):
     links = [
         ("/", "home", "fas fa-home", "لوحة التحكم"),
-        ("/kpi", "kpi", "fas fa-chart-line", "مؤشرات الأداء"),
+        ("/kpi", "kpi", "fas fa-chart-line", "مؤشرات الأداء (KPI)"),
+        ("/channels", "channels", "fas fa-store", "قنوات البيع"),
         ("/products", "products", "fas fa-box", "المنتجات"),
         ("/orders", "orders", "fas fa-clipboard-list", "الطلبات"),
-        ("/ads", "ads", "fas fa-bullhorn", "محل الإعلانات"),
+        ("/pos", "pos", "fas fa-cash-register", "نقطة البيع"),
+        ("/barcode", "barcode", "fas fa-barcode", "الماسح الضوئي"),
+        ("/inventory", "inventory", "fas fa-warehouse", "المخزون"),
+        ("/supply", "supply", "fas fa-truck-loading", "التوريد"),
+        ("/expenses", "expenses", "fas fa-money-bill-wave", "المصاريف"),
         ("/finance", "finance", "fas fa-wallet", "المالية"),
+        ("/users", "users", "fas fa-users", "المستخدمون"),
         ("/customers", "customers", "fas fa-user-friends", "العملاء"),
+        ("/delivery", "delivery", "fas fa-truck", "شريك التوصيل"),
+        ("/analytics", "analytics", "fas fa-chart-bar", "التحليلات"),
+        ("/sendpilot", "sendpilot", "fas fa-paper-plane", "Sendpilot"),
+        ("/ads", "ads", "fas fa-bullhorn", "محل الإعلانات"),
         ("/ai", "ai", "fas fa-robot", "AI"),
     ]
     html = '<div class="sidebar"><h4>Khaled Store</h4>'
@@ -38,6 +49,7 @@ def get_sidebar(active_page):
     html += '</div>'
     return html
 
+# ================== القالب الأساسي (تصميم مصغر) ==================
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -49,31 +61,42 @@ BASE_HTML = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-        body { font-family: 'Cairo', sans-serif; background-color: #f4f6f9; margin: 0; }
-        .sidebar { background: #1a1c2e; color: white; height: 100vh; width: 250px; position: fixed; right: 0; top: 0; overflow-y: auto; }
-        .sidebar h4 { padding: 20px; text-align: center; border-bottom: 1px solid #2d2f45; color: #a855f7; font-weight: bold; }
-        .sidebar a { display: flex; align-items: center; padding: 12px 20px; color: #b0b3c6; text-decoration: none; font-size: 14px; transition: 0.3s; }
-        .sidebar a:hover, .sidebar a.active { background: #2d2f45; color: white; border-right: 4px solid #a855f7; }
-        .sidebar a i { margin-left: 10px; width: 20px; text-align: center; }
-        .main-content { margin-right: 250px; padding: 20px; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .card-custom { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        body { font-family: 'Cairo', sans-serif; background-color: #f4f6f9; margin: 0; font-size: 13px; }
+        
+        /* تصغير القائمة الجانبية */
+        .sidebar { background: #1a1c2e; color: white; height: 100vh; width: 200px; position: fixed; right: 0; top: 0; overflow-y: auto; }
+        .sidebar h4 { padding: 12px; text-align: center; border-bottom: 1px solid #2d2f45; color: #a855f7; font-weight: bold; font-size: 16px; margin: 0; }
+        .sidebar a { display: flex; align-items: center; padding: 8px 12px; color: #b0b3c6; text-decoration: none; font-size: 12px; transition: 0.2s; }
+        .sidebar a:hover, .sidebar a.active { background: #2d2f45; color: white; border-right: 3px solid #a855f7; }
+        .sidebar a i { margin-left: 8px; width: 16px; text-align: center; font-size: 14px; }
+        
+        /* تصغير المحتوى */
+        .main-content { margin-right: 200px; padding: 12px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .topbar h4 { font-size: 16px; margin: 0; font-weight: bold; }
+        .card-custom { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* تصغير الجداول */
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 12px; text-align: right; font-size: 13px; color: #6c757d; border-bottom: 2px solid #dee2e6; }
-        td { padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 13px; vertical-align: middle; }
-        .badge { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+        th { background: #f8f9fa; padding: 8px; text-align: right; font-size: 11px; color: #6c757d; border-bottom: 1px solid #dee2e6; }
+        td { padding: 8px; border-bottom: 1px solid #dee2e6; font-size: 12px; vertical-align: middle; }
+        
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; }
         .badge-pending { background: #fff3cd; color: #856404; }
         .badge-delivered { background: #d4edda; color: #155724; }
-        .action-btn { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center; color: white; text-decoration: none; margin-left: 5px; }
+        
+        .action-btn { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center; color: white; text-decoration: none; margin-left: 3px; font-size: 11px; }
         .btn-whatsapp { background: #25d366; }
         .btn-call { background: #007bff; }
+        
+        .btn-primary { font-size: 12px; padding: 6px 12px; }
     </style>
 </head>
 <body>
     {{ sidebar|safe }}
     <div class="main-content">
         <div class="topbar">
-            <h4 class="mb-0">{{ page_title }}</h4>
+            <h4>{{ page_title }}</h4>
         </div>
         {{ content|safe }}
     </div>
@@ -81,38 +104,7 @@ BASE_HTML = """
 </html>
 """
 
-ADD_ORDER_HTML = """
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-<style>body { font-family: 'Cairo'; background: #f4f6f9; padding: 20px; } .form-container { background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto; }</style></head>
-<body>
-    <div class="form-container">
-        <h3 class="mb-4">إضافة طلب جديد</h3>
-        <form method="POST">
-            <div class="mb-3"><label>اسم العميل</label><input type="text" name="customer" class="form-control" required></div>
-            <div class="mb-3"><label>رقم الهاتف</label><input type="text" name="phone" class="form-control" required></div>
-            <div class="mb-3"><label>العنوان</label><input type="text" name="address" class="form-control" required></div>
-            <div class="mb-3"><label>المنتج</label><input type="text" name="product" class="form-control"></div>
-            <div class="mb-3"><label>المبلغ</label><input type="number" name="amount" class="form-control" required></div>
-            <button type="submit" class="btn btn-primary w-100" style="background:#a855f7; border:none;">حفظ</button>
-        </form>
-        <a href="/" class="d-block text-center mt-3 text-decoration-none">رجوع</a>
-    </div>
-</body></html>
-"""
-
-@app.route('/')
-def dashboard():
-    content = """
-    <div class="card-custom" style="text-align: center; padding: 40px;">
-        <h3 style="color: #a855f7;">أهلاً بك يا خالد!</h3>
-        <p>مرحباً بك في لوحة التحكم الخاصة بمتجرك.</p>
-        <a href="/add" class="btn btn-primary mt-3" style="background:#a855f7; border:none;">+ طلب جديد</a>
-    </div>
-    """
-    return render_template_string(BASE_HTML, sidebar=get_sidebar('home'), page_title="لوحة التحكم", content=content)
-
+# ================== صفحة الطلبات ==================
 @app.route('/orders')
 def orders():
     all_orders = Order.query.order_by(Order.id.desc()).all()
@@ -141,14 +133,38 @@ def orders():
 
     content = f"""
     <div class="card-custom">
-        <div class="mb-3"><a href="/add" class="btn btn-primary" style="background:#a855f7; border:none;">+ طلب جديد</a></div>
-        <table>
-            <thead><tr><th>هاتف العميل</th><th>اسم العميل</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-            <tbody>{rows}</tbody>
-        </table>
+        <div class="mb-2"><a href="/add" class="btn btn-primary" style="background:#a855f7; border:none; font-size:12px;">+ طلب جديد</a></div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead><tr><th>الهاتف</th><th>الاسم</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
     </div>
     """
     return render_template_string(BASE_HTML, sidebar=get_sidebar('orders'), page_title="الطلبات", content=content)
+
+# ================== إضافة طلب ==================
+ADD_ORDER_HTML = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+<style>body { font-family: 'Cairo'; background: #f4f6f9; padding: 15px; font-size: 13px; } .form-container { background: white; padding: 20px; border-radius: 10px; max-width: 500px; margin: 0 auto; }</style></head>
+<body>
+    <div class="form-container">
+        <h4 class="mb-3" style="color:#a855f7;">إضافة طلب جديد</h4>
+        <form method="POST">
+            <div class="mb-2"><label class="form-label" style="font-size:12px;">اسم العميل</label><input type="text" name="customer" class="form-control form-control-sm" required></div>
+            <div class="mb-2"><label class="form-label" style="font-size:12px;">رقم الهاتف</label><input type="text" name="phone" class="form-control form-control-sm" required></div>
+            <div class="mb-2"><label class="form-label" style="font-size:12px;">العنوان</label><input type="text" name="address" class="form-control form-control-sm" required></div>
+            <div class="mb-2"><label class="form-label" style="font-size:12px;">المنتج</label><input type="text" name="product" class="form-control form-control-sm"></div>
+            <div class="mb-2"><label class="form-label" style="font-size:12px;">المبلغ</label><input type="number" name="amount" class="form-control form-control-sm" required></div>
+            <button type="submit" class="btn btn-primary w-100 mt-2" style="background:#a855f7; border:none; font-size:13px;">حفظ</button>
+        </form>
+        <a href="/orders" class="d-block text-center mt-3 text-decoration-none" style="font-size:12px;">رجوع للطلبات</a>
+    </div>
+</body></html>
+"""
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():
@@ -165,19 +181,35 @@ def add():
         return redirect(url_for('orders'))
     return render_template_string(ADD_ORDER_HTML)
 
+# ================== الصفحة الرئيسية ==================
+@app.route('/')
+def dashboard():
+    content = """
+    <div class="card-custom" style="text-align: center; padding: 30px;">
+        <h4 style="color: #a855f7;">أهلاً بك يا خالد!</h4>
+        <p style="font-size: 13px;">مرحباً بك في لوحة التحكم الخاصة بمتجرك.</p>
+        <a href="/orders" class="btn btn-primary mt-2" style="background:#a855f7; border:none; font-size:12px;">الذهاب للطلبات</a>
+    </div>
+    """
+    return render_template_string(BASE_HTML, sidebar=get_sidebar('home'), page_title="لوحة التحكم", content=content)
+
+# ================== الصفحات العامة (باش كلشي يخدم) ==================
 @app.route('/<page_name>')
 def generic_page(page_name):
     titles = {
-        'kpi': 'مؤشرات الأداء', 'products': 'المنتجات', 'ads': 'محل الإعلانات',
-        'finance': 'المالية', 'customers': 'العملاء', 'ai': 'الذكاء الاصطناعي'
+        'kpi': 'مؤشرات الأداء', 'channels': 'قنوات البيع', 'products': 'المنتجات',
+        'pos': 'نقطة البيع', 'barcode': 'الماسح الضوئي', 'inventory': 'المخزون',
+        'supply': 'التوريد', 'expenses': 'المصاريف', 'finance': 'المالية',
+        'users': 'المستخدمون', 'customers': 'العملاء', 'delivery': 'شريك التوصيل',
+        'analytics': 'التحليلات', 'sendpilot': 'Sendpilot', 'ads': 'محل الإعلانات', 'ai': 'الذكاء الاصطناعي'
     }
     title = titles.get(page_name, "صفحة")
     
     content = f"""
-    <div class="card-custom" style="text-align: center; padding: 50px;">
-        <i class="fas fa-tools" style="font-size: 50px; color: #a855f7; margin-bottom: 20px;"></i>
-        <h3>مرحباً بك في قسم {title}</h3>
-        <p class="text-muted">هذه الصفحة جاهزة للربط مع قاعدة البيانات قريباً.</p>
+    <div class="card-custom" style="text-align: center; padding: 30px;">
+        <i class="fas fa-tools" style="font-size: 40px; color: #a855f7; margin-bottom: 15px;"></i>
+        <h4>مرحباً بك في قسم {title}</h4>
+        <p class="text-muted" style="font-size: 12px;">هذه الصفحة جاهزة للربط مع قاعدة البيانات قريباً.</p>
     </div>
     """
     return render_template_string(BASE_HTML, sidebar=get_sidebar(page_name), page_title=title, content=content)
