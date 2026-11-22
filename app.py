@@ -1,9 +1,12 @@
 import os
-from flask import Flask, render_template_string, request, redirect, url_for
+import requests
+from flask import Flask, render_template_string, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect
+from functools import wraps
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "khaled_store_super_secret_key_123")
 
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///khaled_store.db')
 if db_url.startswith("postgres://"):
@@ -11,6 +14,19 @@ if db_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# ================== إعدادات Google OAuth ==================
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "YOUR_CLIENT_ID.apps.googleusercontent.com")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "YOUR_CLIENT_SECRET")
+REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://khaled-store-app.onrender.com/login/callback")
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_email' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # ================== قاعدة البيانات ==================
 class Order(db.Model):
@@ -20,7 +36,7 @@ class Order(db.Model):
     wilaya = db.Column(db.String(50), nullable=False)
     baladiya = db.Column(db.String(50), nullable=False)
     amount = db.Column(db.Float, nullable=False, default=0.0)
-    status = db.Column(db.String(20), default='جديد') # جديد, مؤكد, منجز
+    status = db.Column(db.String(20), default='جديد')
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -28,7 +44,43 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, default=0)
 
-# ================== القالب الأساسي ==================
+# ================== صفحة تسجيل الدخول ==================
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>تسجيل الدخول - Khaled Store</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        * { font-family: 'Cairo', sans-serif; box-sizing: border-box; }
+        body { background-color: #f8f9fa; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+        .login-card { background: #fff; padding: 40px 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center; width: 90%; max-width: 400px; }
+        .logo { width: 80px; height: 80px; background: #ede9fe; color: #8b5cf6; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 35px; margin: 0 auto 20px; }
+        .btn-google { background: #fff; color: #333; border: 1px solid #ddd; padding: 12px; border-radius: 15px; font-weight: 600; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; transition: 0.3s; }
+        .btn-google:hover { background: #f1f1f1; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="logo"><i class="fas fa-store"></i></div>
+        <h4 class="fw-bold mb-2">Khaled Store</h4>
+        <p class="text-muted mb-4" style="font-size: 14px;">مرحباً بك، يرجى تسجيل الدخول للمتابعة</p>
+        
+        <a href="{{ auth_url }}" class="btn-google">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" width="20">
+            المتابعة باستخدام Google
+        </a>
+        
+        <p class="text-muted mt-4" style="font-size: 11px;">تطبيق محمي و آمن 100%</p>
+    </div>
+</body>
+</html>
+"""
+
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -67,10 +119,6 @@ BASE_HTML = """
         .form-control, .form-select { border-radius: 15px; padding: 12px 15px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 14px; margin-bottom: 15px; }
         .form-control:focus, .form-select:focus { box-shadow: none; border-color: #8b5cf6; background: #fff; }
         .form-label { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px; }
-        .nav-tabs { border-bottom: none; gap: 10px; }
-        .nav-tabs .nav-link { border: none; color: #9ca3af; font-weight: 600; padding: 10px 0; font-size: 14px; }
-        .nav-tabs .nav-link.active { color: #8b5cf6; border-bottom: 3px solid #8b5cf6; background: transparent; }
-        .progress-circle { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; margin: 0 auto 10px; }
     </style>
 </head>
 <body>
@@ -86,15 +134,52 @@ BASE_HTML = """
 </html>
 """
 
+# ================== مسارات الدخول (OAuth) ==================
+@app.route('/login')
+def login():
+    if 'user_email' in session:
+        return redirect(url_for('dashboard'))
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope=openid%20email%20profile"
+    return render_template_string(LOGIN_HTML, auth_url=auth_url)
+
+@app.route('/login/callback')
+def callback():
+    code = request.args.get('code')
+    if not code:
+        return redirect(url_for('login'))
+    
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": REDIRECT_URI,
+        "grant_type": "authorization_code"
+    }
+    res = requests.post(token_url, data=data).json()
+    
+    if 'access_token' in res:
+        user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {res['access_token']}"}).json()
+        session['user_email'] = user_info.get('email')
+        session['user_name'] = user_info.get('name')
+        return redirect(url_for('dashboard'))
+    return "فشل تسجيل الدخول. حاول مرة أخرى.", 400
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 # ================== 1. لوحة التحكم ==================
 @app.route('/')
+@login_required
 def dashboard():
     total = Order.query.count()
     delivered = Order.query.filter_by(status='منجز').count()
     confirmed = Order.query.filter_by(status='مؤكد').count()
     sales = db.session.query(db.func.sum(Order.amount)).scalar() or 0
     content = f"""
-    <div class="topbar"><h4>لوحة التحكم</h4><i class="fas fa-bell text-secondary"></i></div>
+    <div class="topbar"><h4>لوحة التحكم</h4><span class="text-muted" style="font-size:12px;">{session.get('user_name')}</span></div>
     <div class="p-3">
         <div class="row g-3 mb-4">
             <div class="col-6"><div class="stat-card" style="background: #fef3c7;"><div class="icon"><i class="fas fa-shopping-cart text-warning"></i></div><h6>إجمالي الطلبات</h6><h3>{total}</h3></div></div>
@@ -108,6 +193,7 @@ def dashboard():
 
 # ================== 2. الطلبات ==================
 @app.route('/orders')
+@login_required
 def orders():
     all_orders = Order.query.order_by(Order.id.desc()).all()
     orders_html = ""
@@ -134,6 +220,7 @@ def orders():
     return render_template_string(BASE_HTML, content=content, active='orders', title='الطلبات')
 
 @app.route('/order/<int:id>', methods=['GET', 'POST'])
+@login_required
 def order_details(id):
     o = Order.query.get_or_404(id)
     if request.method == 'POST':
@@ -173,6 +260,7 @@ def order_details(id):
 
 # ================== 3. إضافة طلب ==================
 @app.route('/add', methods=['GET', 'POST'])
+@login_required
 def add():
     if request.method == 'POST':
         new = Order(customer=request.form['customer'], phone=request.form['phone'], wilaya=request.form['wilaya'], baladiya=request.form['baladiya'], amount=float(request.form.get('amount', 0)))
@@ -195,8 +283,9 @@ def add():
     """
     return render_template_string(BASE_HTML, content=content, active='orders', title='طلب جديد')
 
-# ================== 4. المخزون (Products) ==================
+# ================== 4. المخزون ==================
 @app.route('/products', methods=['GET', 'POST'])
+@login_required
 def products():
     if request.method == 'POST':
         db.session.add(Product(name=request.form['name'], price=float(request.form['price']), stock=int(request.form['stock'])))
@@ -223,15 +312,19 @@ def products():
 
 # ================== 5. حسابي ==================
 @app.route('/profile')
+@login_required
 def profile():
-    content = """
+    content = f"""
     <div class="topbar"><h4>حسابي</h4><i class="fas fa-bars text-secondary"></i></div>
     <div class="p-4 text-center bg-white" style="min-height: 100vh;">
         <div class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 90px; height: 90px;"><i class="fas fa-user fa-3x text-secondary"></i></div>
-        <h5 class="fw-bold m-0">Khaled Store</h5><p class="text-muted" style="font-size: 13px;">مدير المتجر</p>
+        <h5 class="fw-bold m-0">{session.get('user_name', 'Khaled Store')}</h5>
+        <p class="text-muted" style="font-size: 13px;">{session.get('user_email')}</p>
         <div class="rounded-4 shadow-sm text-start mt-4 overflow-hidden border" style="border-color: #eee !important;">
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white"><div><i class="fas fa-user text-secondary ms-2"></i> الاسم</div><div class="text-muted d-flex align-items-center" style="font-size: 13px;">Khaled <i class="fas fa-chevron-left ms-2" style="font-size: 10px;"></i></div></div>
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white"><div><i class="fas fa-phone text-secondary ms-2"></i> رقم الهاتف</div><div class="text-muted d-flex align-items-center" style="font-size: 13px;">0550123456 <i class="fas fa-chevron-left ms-2" style="font-size: 10px;"></i></div></div>
+            <a href="/logout" class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white text-decoration-none text-danger">
+                <div><i class="fas fa-sign-out-alt ms-2"></i> تسجيل الخروج</div>
+                <i class="fas fa-chevron-left" style="font-size: 10px;"></i>
+            </a>
         </div>
     </div>
     """
