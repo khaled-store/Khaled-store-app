@@ -2,4 +2,4 @@ flask
 flask-sqlalchemy
 gunicorn
 psycopg[binary]
-google-generativeai
+requests
