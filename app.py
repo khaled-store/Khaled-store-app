@@ -68,6 +68,7 @@ BASE_HTML = """
 </head>
 <body>
     {{ content|safe }}
+    
     <div class="bottom-nav">
         <a href="/" class="nav-item {% if active == 'home' %}active{% endif %}"><i class="fas fa-home"></i> لوحة التحكم</a>
         <a href="/orders" class="nav-item {% if active == 'orders' %}active{% endif %}"><i class="fas fa-box"></i> الطلبات</a>
@@ -143,6 +144,10 @@ def order_details(id):
             db.session.commit()
         return redirect(url_for('orders'))
     
+    sel_new = 'selected' if o.status == 'جديد' else ''
+    sel_conf = 'selected' if o.status == 'مؤكد' else ''
+    sel_del = 'selected' if o.status == 'منجز' else ''
+
     content = f"""
     <div class="topbar">
         <a href="/orders" class="text-dark"><i class="fas fa-arrow-right"></i></a>
@@ -162,9 +167,9 @@ def order_details(id):
             <h6 class="fw-bold mb-3">تغيير حالة الطلب</h6>
             <form method="POST">
                 <select name="status" class="form-select">
-                    <option value="جديد" {% if o.status == 'جديد' %}selected{% endif %}>جديد</option>
-                    <option value="مؤكد" {% if o.status == 'مؤكد' %}selected{% endif %}>مؤكد</option>
-                    <option value="منجز" {% if o.status == 'منجز' %}selected{% endif %}>منجز</option>
+                    <option value="جديد" {sel_new}>جديد</option>
+                    <option value="مؤكد" {sel_conf}>مؤكد</option>
+                    <option value="منجز" {sel_del}>منجز</option>
                 </select>
                 <button type="submit" class="btn w-100 mt-2" style="background:#8b5cf6; color:white; border-radius:15px;">تحديث الحالة</button>
             </form>
