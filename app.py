@@ -12,16 +12,23 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# ================== قاعدة البيانات ==================
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20), nullable=False)
     wilaya = db.Column(db.String(50), nullable=False)
     baladiya = db.Column(db.String(50), nullable=False)
-    address = db.Column(db.String(200), nullable=True)
     amount = db.Column(db.Float, nullable=False, default=0.0)
-    status = db.Column(db.String(20), default='جديد')
+    status = db.Column(db.String(20), default='جديد') # جديد, مؤكد, منجز
 
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    stock = db.Column(db.Integer, default=0)
+
+# ================== القالب الأساسي ==================
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -68,18 +75,18 @@ BASE_HTML = """
 </head>
 <body>
     {{ content|safe }}
-    
     <div class="bottom-nav">
         <a href="/" class="nav-item {% if active == 'home' %}active{% endif %}"><i class="fas fa-home"></i> لوحة التحكم</a>
         <a href="/orders" class="nav-item {% if active == 'orders' %}active{% endif %}"><i class="fas fa-box"></i> الطلبات</a>
         <a href="/add" class="nav-item add-btn"><i class="fas fa-plus"></i></a>
-        <a href="/stats" class="nav-item {% if active == 'stats' %}active{% endif %}"><i class="fas fa-chart-pie"></i> التحليلات</a>
+        <a href="/products" class="nav-item {% if active == 'products' %}active{% endif %}"><i class="fas fa-cubes"></i> المخزون</a>
         <a href="/profile" class="nav-item {% if active == 'profile' %}active{% endif %}"><i class="fas fa-user"></i> حسابي</a>
     </div>
 </body>
 </html>
 """
 
+# ================== 1. لوحة التحكم ==================
 @app.route('/')
 def dashboard():
     total = Order.query.count()
@@ -95,12 +102,11 @@ def dashboard():
             <div class="col-6"><div class="stat-card" style="background: #ede9fe;"><div class="icon"><i class="fas fa-check-circle" style="color:#8b5cf6;"></i></div><h6>طلب مؤكد</h6><h3>{confirmed}</h3></div></div>
             <div class="col-6"><div class="stat-card" style="background: #e0f2fe;"><div class="icon"><i class="fas fa-wallet text-primary"></i></div><h6>المبيعات</h6><h3>{sales} <span style="font-size:12px;">د.ج</span></h3></div></div>
         </div>
-        <h6 class="fw-bold mb-3" style="border-right: 4px solid #8b5cf6; padding-right: 10px;">أفضل المنتجات</h6>
-        <div class="bg-white p-4 rounded-4 shadow-sm text-center text-muted" style="font-size:13px;"><i class="fas fa-box-open fa-2x mb-2 text-secondary opacity-50"></i><br>لا توجد مبيعات كافية لعرض المنتجات الأكثر طلباً.</div>
     </div>
     """
     return render_template_string(BASE_HTML, content=content, active='home', title='لوحة التحكم')
 
+# ================== 2. الطلبات ==================
 @app.route('/orders')
 def orders():
     all_orders = Order.query.order_by(Order.id.desc()).all()
@@ -123,13 +129,6 @@ def orders():
         """
     content = f"""
     <div class="topbar"><h4>الطلبات</h4><i class="fas fa-filter text-secondary"></i></div>
-    <div class="bg-white px-3 pt-2">
-        <ul class="nav nav-tabs nav-justified mb-0">
-            <li class="nav-item"><a class="nav-link active" href="/orders">الكل</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">جديد</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">مؤكد</a></li>
-        </ul>
-    </div>
     <div class="p-3">{orders_html or '<div class="text-center text-muted mt-5">لا توجد طلبات حالياً.</div>'}</div>
     """
     return render_template_string(BASE_HTML, content=content, active='orders', title='الطلبات')
@@ -149,20 +148,14 @@ def order_details(id):
     sel_del = 'selected' if o.status == 'منجز' else ''
 
     content = f"""
-    <div class="topbar">
-        <a href="/orders" class="text-dark"><i class="fas fa-arrow-right"></i></a>
-        <h4>تفاصيل الطلب</h4>
-        <div style="width:20px;"></div>
-    </div>
+    <div class="topbar"><a href="/orders" class="text-dark"><i class="fas fa-arrow-right"></i></a><h4>تفاصيل الطلب</h4><div style="width:20px;"></div></div>
     <div class="p-4">
         <div class="bg-white p-4 rounded-4 shadow-sm mb-4">
             <h5 class="fw-bold mb-1">{o.customer}</h5>
             <p class="text-muted mb-3" style="font-size:13px;">{o.phone}</p>
             <div class="mb-2"><i class="fas fa-map-marker-alt text-secondary ms-2"></i> {o.wilaya} - {o.baladiya}</div>
-            <div class="mb-3"><i class="fas fa-home text-secondary ms-2"></i> {o.address or 'بدون عنوان'}</div>
-            <h4 class="fw-bold text-primary">{o.amount} د.ج</h4>
+            <h4 class="fw-bold text-primary mt-3">{o.amount} د.ج</h4>
         </div>
-        
         <div class="bg-white p-4 rounded-4 shadow-sm">
             <h6 class="fw-bold mb-3">تغيير حالة الطلب</h6>
             <form method="POST">
@@ -178,10 +171,11 @@ def order_details(id):
     """
     return render_template_string(BASE_HTML, content=content, active='orders', title='تفاصيل')
 
+# ================== 3. إضافة طلب ==================
 @app.route('/add', methods=['GET', 'POST'])
 def add():
     if request.method == 'POST':
-        new = Order(customer=request.form['customer'], phone=request.form['phone'], wilaya=request.form['wilaya'], baladiya=request.form['baladiya'], address=request.form.get('address', ''), amount=float(request.form.get('amount', 0)))
+        new = Order(customer=request.form['customer'], phone=request.form['phone'], wilaya=request.form['wilaya'], baladiya=request.form['baladiya'], amount=float(request.form.get('amount', 0)))
         db.session.add(new)
         db.session.commit()
         return redirect(url_for('orders'))
@@ -194,7 +188,6 @@ def add():
             <label class="form-label">اختر الولاية</label>
             <select name="wilaya" class="form-select" required><option value="" disabled selected>اختر الولاية</option><option value="الجزائر">الجزائر</option><option value="وهران">وهران</option><option value="قسنطينة">قسنطينة</option><option value="سطيف">سطيف</option></select>
             <label class="form-label">اختر البلدية</label><input type="text" name="baladiya" class="form-control" placeholder="اكتب البلدية" required>
-            <label class="form-label">عنوان العميل</label><input type="text" name="address" class="form-control">
             <label class="form-label">المبلغ (د.ج)</label><input type="number" name="amount" class="form-control" required>
             <button type="submit" class="btn w-100 mt-4" style="background:#8b5cf6; color:white; border-radius:15px; padding:14px; font-weight:bold; font-size:16px;">حفظ الطلب</button>
         </form>
@@ -202,23 +195,33 @@ def add():
     """
     return render_template_string(BASE_HTML, content=content, active='orders', title='طلب جديد')
 
-@app.route('/stats')
-def stats():
-    content = """
-    <div class="topbar"><h4>التحليلات</h4><i class="fas fa-filter text-secondary"></i></div>
+# ================== 4. المخزون (Products) ==================
+@app.route('/products', methods=['GET', 'POST'])
+def products():
+    if request.method == 'POST':
+        db.session.add(Product(name=request.form['name'], price=float(request.form['price']), stock=int(request.form['stock'])))
+        db.session.commit()
+        return redirect(url_for('products'))
+    all_p = Product.query.all()
+    rows = "".join([f"<tr><td>{p.name}</td><td>{p.price} د.ج</td><td>{p.stock}</td></tr>" for p in all_p])
+    content = f"""
+    <div class="topbar"><h4>المخزون</h4><i class="fas fa-plus text-secondary"></i></div>
     <div class="p-3">
-        <ul class="nav nav-tabs nav-justified mb-4 bg-white rounded-3 shadow-sm p-1">
-            <li class="nav-item"><a class="nav-link active" href="#">الأداء</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">التأكيد</a></li>
-        </ul>
-        <div class="row g-3 text-center">
-            <div class="col-6"><div class="bg-white p-4 rounded-4 shadow-sm"><div class="progress-circle" style="border: 8px solid #10b981; border-left-color: #e5e7eb; border-bottom-color: #e5e7eb; color:#10b981;">62%</div><h6 class="fw-bold m-0" style="font-size:12px;">معدل التأكيد</h6></div></div>
-            <div class="col-6"><div class="bg-white p-4 rounded-4 shadow-sm"><div class="progress-circle" style="border: 8px solid #f59e0b; border-left-color: #e5e7eb; border-top-color: #e5e7eb; color:#f59e0b;">54%</div><h6 class="fw-bold m-0" style="font-size:12px;">معدل التسليم</h6></div></div>
-        </div>
+        <form method="POST" class="row g-2 mb-4 bg-white p-3 rounded-4 shadow-sm">
+            <div class="col-6"><input type="text" name="name" class="form-control" placeholder="اسم المنتج" required></div>
+            <div class="col-3"><input type="number" name="price" class="form-control" placeholder="السعر" required></div>
+            <div class="col-3"><input type="number" name="stock" class="form-control" placeholder="الكمية" required></div>
+            <div class="col-12"><button type="submit" class="btn w-100" style="background:#8b5cf6; color:white; border-radius:10px;">إضافة منتج</button></div>
+        </form>
+        <table class="table bg-white rounded-4 shadow-sm text-center">
+            <thead class="table-light"><tr><th>المنتج</th><th>السعر</th><th>الكمية</th></tr></thead>
+            <tbody>{rows or '<tr><td colspan=3>لا توجد منتجات.</td></tr>'}</tbody>
+        </table>
     </div>
     """
-    return render_template_string(BASE_HTML, content=content, active='stats', title='التحليلات')
+    return render_template_string(BASE_HTML, content=content, active='products', title='المخزون')
 
+# ================== 5. حسابي ==================
 @app.route('/profile')
 def profile():
     content = """
@@ -229,12 +232,12 @@ def profile():
         <div class="rounded-4 shadow-sm text-start mt-4 overflow-hidden border" style="border-color: #eee !important;">
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white"><div><i class="fas fa-user text-secondary ms-2"></i> الاسم</div><div class="text-muted d-flex align-items-center" style="font-size: 13px;">Khaled <i class="fas fa-chevron-left ms-2" style="font-size: 10px;"></i></div></div>
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white"><div><i class="fas fa-phone text-secondary ms-2"></i> رقم الهاتف</div><div class="text-muted d-flex align-items-center" style="font-size: 13px;">0550123456 <i class="fas fa-chevron-left ms-2" style="font-size: 10px;"></i></div></div>
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white"><div><i class="fas fa-globe text-secondary ms-2"></i> اللغة</div><div class="text-muted d-flex align-items-center" style="font-size: 13px;">العربية <i class="fas fa-chevron-left ms-2" style="font-size: 10px;"></i></div></div>
         </div>
     </div>
     """
     return render_template_string(BASE_HTML, content=content, active='profile', title='حسابي')
 
+# ================== التحديث التلقائي للداتا ==================
 with app.app_context():
     try:
         db.create_all()
