@@ -1,57 +1,43 @@
-from flask import Flask, redirect, url_for, session, request
-import requests
+from flask import Flask, render_template_string
 
 app = Flask(__name__)
-# ضع مفتاحاً سرياً خاصاً بك هنا
-app.secret_key = 'my_secret_key_123'
 
-# ضع هنا بياناتك الحقيقية
-CLIENT_ID = 'YOUR_CLIENT_ID_HERE'
-CLIENT_SECRET = 'YOUR_CLIENT_SECRET_HERE'
-REDIRECT_URI = 'http://localhost:5000/callback'
+# كود الواجهة (HTML) داخل المتغير
+html_template = """
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>لوحة تحكم خالد ستور</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0; color: #888; }
+        .card p { font-size: 24px; font-weight: bold; margin: 10px 0 0; }
+        .orange { border-right: 5px solid orange; }
+        .green { border-right: 5px solid green; }
+    </style>
+</head>
+<body>
+    <h1>لوحة التحكم</h1>
+    <div class="grid">
+        <div class="card orange">
+            <h3>طلب مؤكد</h3>
+            <p>3.2K</p>
+        </div>
+        <div class="card green">
+            <h3>الطلبات المسلمة</h3>
+            <p>1.7K</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
 
 @app.route('/')
 def home():
-    if 'user_email' in session:
-        return f"أهلاً بك يا {session['user_email']}! أنت الآن مسجل دخول."
-    return '<a href="/login">اضغط هنا لتسجيل الدخول عبر Google</a>'
-
-@app.route('/login')
-def login():
-    # رابط جوجل لطلب الدخول
-    google_auth_url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&"
-        f"response_type=code&scope=email profile"
-    )
-    return redirect(google_auth_url)
-
-@app.route('/callback')
-def callback():
-    code = request.args.get('code')
-    # تبديل الكود بـ Token
-    token_response = requests.post(
-        "https://oauth2.googleapis.com/token",
-        data={
-            'code': code,
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-            'redirect_uri': REDIRECT_URI,
-            'grant_type': 'authorization_code'
-        }
-    ).json()
-
-    access_token = token_response.get('access_token')
-    
-    # جلب معلومات المستخدم
-    user_info = requests.get(
-        "https://www.googleapis.com/oauth2/v1/userinfo",
-        headers={'Authorization': f'Bearer {access_token}'}
-    ).json()
-
-    session['user_email'] = user_info['email']
-    return redirect(url_for('home'))
+    return render_template_string(html_template)
 
 if __name__ == '__main__':
-    # تأكد أن المنصة التي تستخدمها تسمح بفتح البورت 5000
     app.run(debug=True, port=5000)
