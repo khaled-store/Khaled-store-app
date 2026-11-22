@@ -1,6 +1,7 @@
 import os
 from flask import Flask, render_template_string, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect
 
 app = Flask(__name__)
 
@@ -11,6 +12,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# ================== قاعدة البيانات ==================
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer = db.Column(db.String(100), nullable=False)
@@ -21,6 +23,7 @@ class Order(db.Model):
     amount = db.Column(db.Float, nullable=False, default=0.0)
     status = db.Column(db.String(20), default='جديد')
 
+# ================== القالب الأساسي ==================
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -84,6 +87,7 @@ BASE_HTML = """
 </html>
 """
 
+# ================== المسارات ==================
 @app.route('/')
 def dashboard():
     total = Order.query.count()
@@ -284,8 +288,21 @@ def profile():
     """
     return render_template_string(BASE_HTML, content=content, active='profile', title='حسابي')
 
+# ================== التحديث التلقائي للداتا ==================
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+        inspector = inspect(db.engine)
+        # إذا كان الجدول القديم موجود و ينقصه عمود wilaya
+        if 'order' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('order')]
+            if 'wilaya' not in columns:
+                db.drop_all()
+                db.create_all()
+    except Exception as e:
+        print("DB Auto-Reset:", e)
+        db.drop_all()
+        db.create_all()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
